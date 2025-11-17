@@ -12,7 +12,7 @@ html, body {
 body {
     position: relative;
     overflow: hidden;
-    transition: background-color 1.5s ease-in-out;
+    transition: background-color 5.0s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .background-layer {

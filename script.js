@@ -174,6 +174,9 @@ const SwirlBackground = (() => {
 
             this.currentConfig = null;
             this.targetConfig = null;
+            this.startConfig = null;
+            this.transitionStartTime = null;
+            this.transitionDuration = 5.0; // seconds - slower, smoother transitions
             this.isReady = true;
 
             this.resize();
@@ -246,31 +249,52 @@ const SwirlBackground = (() => {
 
         setState(config) {
             if (!config) return;
-            this.targetConfig = this.cloneConfig(config);
-            if (!this.currentConfig) {
+            
+            // If we're already transitioning, start from current position
+            if (this.currentConfig && this.targetConfig) {
+                this.startConfig = this.cloneConfig(this.currentConfig);
+            } else if (!this.currentConfig) {
+                // First time initialization
                 this.currentConfig = this.cloneConfig(config);
+                this.startConfig = this.cloneConfig(config);
+            } else {
+                // Start from current config
+                this.startConfig = this.cloneConfig(this.currentConfig);
             }
+            
+            this.targetConfig = this.cloneConfig(config);
+            this.transitionStartTime = performance.now() * 0.001;
         },
 
-        updateConfig(delta) {
-            if (!this.targetConfig || !this.currentConfig) return;
-            const alpha = 1.0 - Math.pow(0.1, delta);
+        updateConfig(currentTime) {
+            if (!this.targetConfig || !this.currentConfig || !this.startConfig || !this.transitionStartTime) return;
+            
+            // Calculate progress from 0 to 1
+            const elapsed = currentTime - this.transitionStartTime;
+            let progress = Math.min(elapsed / this.transitionDuration, 1.0);
+            
+            // Apply very smooth ease-in-out curve for gentle transitions
+            // Quintic ease-in-out: even smoother acceleration and deceleration
+            const easeInOut = progress < 0.5
+                ? 16.0 * progress * progress * progress * progress * progress
+                : 1.0 - Math.pow(-2.0 * progress + 2.0, 5.0) / 2.0;
+            
+            const alpha = easeInOut;
 
-            this.currentConfig.primary = mixVec3(this.currentConfig.primary, this.targetConfig.primary, alpha);
-            this.currentConfig.secondary = mixVec3(this.currentConfig.secondary, this.targetConfig.secondary, alpha);
-            this.currentConfig.speed = lerp(this.currentConfig.speed, this.targetConfig.speed, alpha);
-            this.currentConfig.intensity = lerp(this.currentConfig.intensity, this.targetConfig.intensity, alpha);
-            this.currentConfig.noiseScale = lerp(this.currentConfig.noiseScale, this.targetConfig.noiseScale, alpha);
-            this.currentConfig.distortion = lerp(this.currentConfig.distortion, this.targetConfig.distortion, alpha);
+            // Interpolate from start to target
+            this.currentConfig.primary = mixVec3(this.startConfig.primary, this.targetConfig.primary, alpha);
+            this.currentConfig.secondary = mixVec3(this.startConfig.secondary, this.targetConfig.secondary, alpha);
+            this.currentConfig.speed = lerp(this.startConfig.speed, this.targetConfig.speed, alpha);
+            this.currentConfig.intensity = lerp(this.startConfig.intensity, this.targetConfig.intensity, alpha);
+            this.currentConfig.noiseScale = lerp(this.startConfig.noiseScale, this.targetConfig.noiseScale, alpha);
+            this.currentConfig.distortion = lerp(this.startConfig.distortion, this.targetConfig.distortion, alpha);
         },
 
         render(time) {
             if (!this.gl || !this.currentConfig) return;
 
             const now = performance.now() * 0.001;
-            const delta = this.lastTime ? now - this.lastTime : 0.016;
-            this.lastTime = now;
-            this.updateConfig(delta);
+            this.updateConfig(now);
 
             this.gl.clear(this.gl.COLOR_BUFFER_BIT);
 
