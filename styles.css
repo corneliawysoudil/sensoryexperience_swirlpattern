@@ -1,0 +1,156 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    position: relative;
+    overflow: hidden;
+    transition: background-color 1.5s ease-in-out;
+}
+
+.background-layer {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    opacity: 0.9;
+}
+
+/* Button Container */
+.button-container {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+    z-index: 1000;
+}
+
+/* Button Styling */
+.state-button {
+    padding: 12px 24px;
+    font-size: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.state-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+.state-button.active {
+    background-color: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+}
+
+/* State: Standby - Very dark, almost black, almost no movement */
+.state-standby {
+    background-color: #0a0a0a;
+    animation: standby-pulse 8s ease-in-out infinite;
+}
+
+@keyframes standby-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.98;
+    }
+}
+
+/* State: Arrival - Cold bluish/white, subtle static or slow flicker */
+.state-arrival {
+    background-color: #1a2332;
+    animation: arrival-flicker 3s ease-in-out infinite;
+}
+
+@keyframes arrival-flicker {
+    0%, 100% {
+        background-color: #1a2332;
+    }
+    25% {
+        background-color: #2d3a4f;
+    }
+    50% {
+        background-color: #1f2937;
+    }
+    75% {
+        background-color: #253448;
+    }
+}
+
+/* State: Alert - Sharp red/orange, faster flicker or pulse */
+.state-alert {
+    background-color: #8b1a1a;
+    animation: alert-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes alert-pulse {
+    0%, 100% {
+        background-color: #8b1a1a;
+        box-shadow: 0 0 0 0 rgba(255, 69, 0, 0.4);
+    }
+    50% {
+        background-color: #ff4500;
+        box-shadow: 0 0 50px 20px rgba(255, 69, 0, 0.2);
+    }
+}
+
+/* State: Adaptive - Deep blue/teal, soft wave-like animation */
+.state-adaptive {
+    background-color: #0d2b3d;
+    animation: adaptive-wave 6s ease-in-out infinite;
+    position: relative;
+}
+
+@keyframes adaptive-wave {
+    0%, 100% {
+        background-color: #0d2b3d;
+    }
+    25% {
+        background-color: #1a4a5c;
+    }
+    50% {
+        background-color: #154051;
+    }
+    75% {
+        background-color: #1a4a5c;
+    }
+}
+
+/* State: Connection - Warm amber, slow breathing glow */
+.state-connection {
+    background-color: #4a2c0a;
+    animation: connection-breathe 4s ease-in-out infinite;
+}
+
+@keyframes connection-breathe {
+    0%, 100% {
+        background-color: #4a2c0a;
+        box-shadow: inset 0 0 100px rgba(139, 105, 20, 0.1);
+    }
+    50% {
+        background-color: #8b6914;
+        box-shadow: inset 0 0 150px rgba(139, 105, 20, 0.3);
+    }
+}
+
