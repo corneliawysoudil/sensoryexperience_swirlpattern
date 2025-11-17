@@ -64,24 +64,32 @@ const SwirlBackground = (() => {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
         }
 
-        float noise(vec2 p) {
+        float noise(vec2 p, float sharpness) {
             vec2 i = floor(p);
             vec2 f = fract(p);
             float a = hash(i);
             float b = hash(i + vec2(1.0, 0.0));
             float c = hash(i + vec2(0.0, 1.0));
             float d = hash(i + vec2(1.0, 1.0));
-            vec2 u = f * f * (3.0 - 2.0 * f);
+            
+            // Interpolation based on sharpness: smooth for low speed, sharp for high speed
+            // sharpness is normalized 0-1, where 0 = smooth curves, 1 = sharp/spikey
+            float curvePower = mix(2.0, 0.3, sharpness); // 2.0 = smooth, 0.3 = sharp/spikey
+            
+            vec2 u;
+            u.x = pow(f.x, curvePower);
+            u.y = pow(f.y, curvePower);
+            
             return mix(a, b, u.x) +
                    (c - a) * u.y * (1.0 - u.x) +
                    (d - b) * u.x * u.y;
         }
 
-        float fbm(vec2 p) {
+        float fbm(vec2 p, float sharpness) {
             float total = 0.0;
             float amplitude = 0.5;
             for (int i = 0; i < 5; i++) {
-                total += noise(p) * amplitude;
+                total += noise(p, sharpness) * amplitude;
                 p *= 2.0;
                 amplitude *= 0.5;
             }
@@ -92,17 +100,31 @@ const SwirlBackground = (() => {
             vec2 uv = gl_FragCoord.xy / u_resolution.xy;
             vec2 centered = (uv - 0.5) * vec2(u_resolution.x / u_resolution.y, 1.0);
 
-            float t = u_time * u_speed;
-            float flow = fbm(centered * u_noiseScale + t);
-            float swirl = fbm(centered * (u_noiseScale * 0.5) + vec2(flow * u_distortion));
+            // Normalize speed to control curve sharpness (0.08 to 0.9 range)
+            float normalizedSpeed = clamp((u_speed - 0.05) / 0.85, 0.0, 1.0);
+            float curveSharpness = normalizedSpeed;
 
-            float angle = swirl * 6.2831;
+            float t = u_time * u_speed;
+            float flow = fbm(centered * u_noiseScale + t, curveSharpness);
+            float swirl = fbm(centered * (u_noiseScale * 0.5) + vec2(flow * u_distortion), curveSharpness);
+
+            // Make rotation angle changes more abrupt for high speed (spikey curves)
+            float angleMultiplier = mix(1.0, 2.5, normalizedSpeed); // More rotation variation at high speed
+            float angle = swirl * 6.2831 * angleMultiplier;
             float s = sin(angle);
             float c = cos(angle);
             vec2 rotated = mat2(c, -s, s, c) * centered;
 
-            float layered = fbm(rotated * (u_noiseScale * 1.8) + t * 0.2);
-            float pattern = smoothstep(0.1, 0.9, layered * u_intensity);
+            float layered = fbm(rotated * (u_noiseScale * 1.8) + t * 0.2, curveSharpness);
+            
+            // Adjust smoothstep edges based on speed: sharper transitions for high speed
+            float edgeLow = mix(0.1, 0.3, normalizedSpeed);
+            float edgeHigh = mix(0.9, 0.7, normalizedSpeed);
+            float pattern = smoothstep(edgeLow, edgeHigh, layered * u_intensity);
+            
+            // Apply additional sharpening for very high speeds (spikey effect)
+            float spikeFactor = clamp((normalizedSpeed - 0.7) / 0.3, 0.0, 1.0);
+            pattern = mix(pattern, pow(pattern, 0.4), spikeFactor);
 
             vec3 color = mix(u_colorA, u_colorB, pattern);
             gl_FragColor = vec4(color, 1.0);
