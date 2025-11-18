@@ -331,6 +331,18 @@ const ExhibitionState = {
             });
         });
 
+        // LED connection button handler
+        const ledConnectBtn = document.getElementById('led-connect-btn');
+        if (ledConnectBtn) {
+            ledConnectBtn.addEventListener('click', async () => {
+                if (LEDController.isConnected) {
+                    await LEDController.disconnect();
+                } else {
+                    await LEDController.connect();
+                }
+            });
+        }
+
         this.changeState('standby');
     },
 
@@ -358,8 +370,10 @@ const ExhibitionState = {
             SwirlBackground.setState(stateConfigs[newState]);
         }
 
-        // Hook point for LED/projection integration
-        // this.onStateChange?.(newState);
+        // Update LED strip when state changes
+        if (LEDController && LEDController.isConnected) {
+            LEDController.setState(newState);
+        }
     }
 };
 

@@ -8,6 +8,10 @@
 </head>
 <body class="state-standby">
     <canvas id="background-canvas" class="background-layer"></canvas>
+    <div class="led-controls">
+        <button id="led-connect-btn" class="led-connect-btn">Connect LED</button>
+        <span id="led-connection-status" class="led-status disconnected">Disconnected</span>
+    </div>
     <div class="button-container">
         <button class="state-button active" data-state="standby">Standby</button>
         <button class="state-button" data-state="arrival">Arrival</button>
@@ -15,6 +19,7 @@
         <button class="state-button" data-state="adaptive">Adaptive</button>
         <button class="state-button" data-state="connection">Connection</button>
     </div>
+    <script src="ledController.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
