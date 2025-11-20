@@ -324,11 +324,21 @@ const SwirlBackground = (() => {
                 ? 16.0 * progress * progress * progress * progress * progress
                 : 1.0 - Math.pow(-2.0 * progress + 2.0, 5.0) / 2.0;
             
+            // Gentler easing function specifically for colors - creates smoother gradient transitions
+            // Uses a smoother ease-in-out curve with more gradual acceleration/deceleration
+            // This creates a more gradual gradient effect instead of sudden color changes
+            const easeColor = progress < 0.5
+                ? 2.0 * progress * progress * progress * progress
+                : 1.0 - Math.pow(-2.0 * progress + 2.0, 4.0) / 2.0;
+            
             const alpha = easeInOut;
+            const colorAlpha = easeColor;
 
             // Interpolate from start to target
-            this.currentConfig.primary = mixVec3(this.startConfig.primary, this.targetConfig.primary, alpha);
-            this.currentConfig.secondary = mixVec3(this.startConfig.secondary, this.targetConfig.secondary, alpha);
+            // Use gentler easing for colors to create smooth gradient transitions
+            this.currentConfig.primary = mixVec3(this.startConfig.primary, this.targetConfig.primary, colorAlpha);
+            this.currentConfig.secondary = mixVec3(this.startConfig.secondary, this.targetConfig.secondary, colorAlpha);
+            // Keep quintic easing for other parameters
             this.currentConfig.speed = lerp(this.startConfig.speed, this.targetConfig.speed, alpha);
             this.currentConfig.intensity = lerp(this.startConfig.intensity, this.targetConfig.intensity, alpha);
             this.currentConfig.noiseScale = lerp(this.startConfig.noiseScale, this.targetConfig.noiseScale, alpha);
