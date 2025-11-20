@@ -1,43 +1,88 @@
 const stateConfigs = {
     standby: {
-        primary: [0.01, 0.01, 0.01],
-        secondary: [0.4, 0.4, 0.4],
+        primary: [0.04, 0.05, 0.08],
+        secondary: [0.22, 0.3, 0.35],
         speed: 0.08,
-        intensity: 0.35,
-        noiseScale: 1.4,
-        distortion: 1.2
+        intensity: 0.42,
+        noiseScale: 1.5,
+        distortion: 1.25
     },
     arrival: {
         primary: [0.08, 0.11, 0.18],
-        secondary: [0.78, 0.86, 0.95],
-        speed: 0.25,
-        intensity: 0.55,
-        noiseScale: 1.9,
-        distortion: 1.6
+        secondary: [0.7, 0.82, 0.92],
+        speed: 0.16,
+        intensity: 0.5,
+        noiseScale: 1.7,
+        distortion: 1.4
     },
     alert: {
-        primary: [0.35, 0.05, 0.03],
-        secondary: [1.0, 0.32, 0.0],
-        speed: 0.9,
-        intensity: 0.85,
-        noiseScale: 2.6,
-        distortion: 2.0
+        primary: [0.32, 0.05, 0.03],
+        secondary: [0.95, 0.35, 0.05],
+        speed: 0.5,
+        intensity: 0.7,
+        noiseScale: 2.1,
+        distortion: 1.6
     },
     adaptive: {
-        primary: [0.02, 0.16, 0.25],
-        secondary: [0.19, 0.72, 0.82],
-        speed: 0.35,
-        intensity: 0.65,
-        noiseScale: 1.3,
-        distortion: 2.2
+        primary: [0.18, 0.11, 0.31],
+        secondary: [0.65, 0.35, 0.75],
+        speed: 0.25,
+        intensity: 0.58,
+        noiseScale: 1.2,
+        distortion: 1.9
     },
     connection: {
         primary: [0.25, 0.15, 0.06],
         secondary: [0.93, 0.65, 0.22],
-        speed: 0.18,
-        intensity: 0.6,
-        noiseScale: 1.1,
-        distortion: 1.4
+        speed: 0.12,
+        intensity: 0.52,
+        noiseScale: 1.0,
+        distortion: 1.2
+    }
+};
+
+const InactivityWatcher = {
+    timeout: 5 * 60 * 1000,
+    timer: null,
+    callback: null,
+    events: ['pointerdown', 'keydown', 'touchstart'],
+    init(callback) {
+        this.callback = callback;
+        this.boundReset = () => this.reset();
+        this.events.forEach(event => {
+            document.addEventListener(event, this.boundReset, { passive: true });
+        });
+        this.reset();
+    },
+    reset() {
+        clearTimeout(this.timer);
+        this.timer = setTimeout(() => {
+            if (typeof this.callback === 'function') {
+                this.callback();
+            }
+        }, this.timeout);
+    }
+};
+
+const role = document.body?.dataset?.role || 'controller';
+const hasBroadcastChannel = typeof BroadcastChannel !== 'undefined';
+const stateChannel = hasBroadcastChannel ? new BroadcastChannel('exhibition-state') : null;
+
+const safeStorage = {
+    get(key) {
+        try {
+            return window.localStorage.getItem(key);
+        } catch (err) {
+            console.warn('Unable to access localStorage', err);
+            return null;
+        }
+    },
+    set(key, value) {
+        try {
+            window.localStorage.setItem(key, value);
+        } catch (err) {
+            console.warn('Unable to access localStorage', err);
+        }
     }
 };
 
@@ -176,7 +221,7 @@ const SwirlBackground = (() => {
             this.targetConfig = null;
             this.startConfig = null;
             this.transitionStartTime = null;
-            this.transitionDuration = 5.0; // seconds - slower, smoother transitions
+            this.transitionDuration = 11.0; // seconds - slower, smoother transitions
             this.isReady = true;
 
             this.resize();
@@ -318,35 +363,73 @@ const SwirlBackground = (() => {
 // State management for exhibition states
 const ExhibitionState = {
     currentState: null,
+    channel: stateChannel,
+    role,
 
     init() {
         const canvas = document.getElementById('background-canvas');
         SwirlBackground.init(canvas);
 
-        const buttons = document.querySelectorAll('.state-button');
-        buttons.forEach(button => {
-            button.addEventListener('click', (e) => {
-                const newState = e.target.getAttribute('data-state');
-                this.changeState(newState);
+        if (this.role === 'controller') {
+            const buttons = document.querySelectorAll('.state-button');
+            buttons.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const newState = e.target.getAttribute('data-state');
+                    this.changeState(newState);
+                });
             });
-        });
 
-        // LED connection button handler
-        const ledConnectBtn = document.getElementById('led-connect-btn');
-        if (ledConnectBtn) {
-            ledConnectBtn.addEventListener('click', async () => {
-                if (LEDController.isConnected) {
-                    await LEDController.disconnect();
-                } else {
-                    await LEDController.connect();
-                }
-            });
+            // LED connection button handler
+            const ledConnectBtn = document.getElementById('led-connect-btn');
+            if (ledConnectBtn && typeof LEDController !== 'undefined') {
+                ledConnectBtn.addEventListener('click', async () => {
+                    if (LEDController.isConnected) {
+                        await LEDController.disconnect();
+                    } else {
+                        await LEDController.connect();
+                    }
+                });
+            } else if (ledConnectBtn) {
+                ledConnectBtn.disabled = true;
+                ledConnectBtn.textContent = 'Unavailable';
+            }
         }
 
-        this.changeState('standby');
+        this.setupChannelSync();
+
+        const storedState = safeStorage.get('exhibitionState');
+        this.changeState(storedState || 'standby', { broadcast: false, persist: this.role === 'controller' });
+
+        if (this.role === 'controller') {
+            this.inactivityWatcher = InactivityWatcher;
+            this.inactivityWatcher.init(() => {
+                this.changeState('standby', { persist: true });
+            });
+        }
     },
 
-    changeState(newState) {
+    setupChannelSync() {
+        if (!this.channel) {
+            return;
+        }
+
+        if (this.role === 'controller') {
+            this.channel.addEventListener('message', (event) => {
+                if (event.data?.type === 'state-request' && this.currentState) {
+                    this.channel.postMessage({ type: 'state-change', state: this.currentState });
+                }
+            });
+        } else {
+            this.channel.addEventListener('message', (event) => {
+                if (event.data?.type === 'state-change') {
+                    this.changeState(event.data.state, { broadcast: false, persist: false });
+                }
+            });
+            this.channel.postMessage({ type: 'state-request' });
+        }
+    },
+
+    changeState(newState, { broadcast = true, persist } = {}) {
         if (newState === this.currentState) {
             return;
         }
@@ -371,8 +454,21 @@ const ExhibitionState = {
         }
 
         // Update LED strip when state changes
-        if (LEDController && LEDController.isConnected) {
+        if (typeof LEDController !== 'undefined' && LEDController.isConnected) {
             LEDController.setState(newState);
+        }
+
+        const shouldPersist = typeof persist === 'boolean' ? persist : this.role === 'controller';
+        if (shouldPersist) {
+            safeStorage.set('exhibitionState', newState);
+        }
+
+        if (broadcast && this.role === 'controller' && this.channel) {
+            this.channel.postMessage({ type: 'state-change', state: newState });
+        }
+
+        if (this.role === 'controller' && this.inactivityWatcher) {
+            this.inactivityWatcher.reset();
         }
     }
 };

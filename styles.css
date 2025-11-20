@@ -12,7 +12,7 @@ html, body {
 body {
     position: relative;
     overflow: hidden;
-    transition: background-color 5.0s cubic-bezier(0.25, 0.1, 0.25, 1);
+    transition: background-color 12s cubic-bezier(0.4, 0.0, 0.2, 1);
 }
 
 .background-layer {
@@ -124,15 +124,31 @@ body {
 
 /* State: Standby - Very dark, almost black, almost no movement */
 .state-standby {
-    background-color: #0a0a0a;
-    animation: standby-pulse 8s ease-in-out infinite;
+    background-color: #111417;
+    animation: standby-pulse 18s cubic-bezier(0.4, 0.0, 0.6, 1.0) infinite;
+}
+
+body.state-standby::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at 30% 30%, rgba(80, 110, 150, 0.15), transparent 55%),
+                radial-gradient(circle at 70% 65%, rgba(170, 150, 100, 0.1), transparent 50%);
+    mix-blend-mode: screen;
+    opacity: 0.8;
+    transition: opacity 2s ease, transform 12s ease;
+    transform: scale(1);
 }
 
 @keyframes standby-pulse {
     0%, 100% {
         opacity: 1;
     }
-    50% {
+    35% {
+        opacity: 0.97;
+    }
+    65% {
         opacity: 0.98;
     }
 }
@@ -140,28 +156,31 @@ body {
 /* State: Arrival - Cold bluish/white, subtle static or slow flicker */
 .state-arrival {
     background-color: #1a2332;
-    animation: arrival-flicker 3s ease-in-out infinite;
+    animation: arrival-flicker 8s cubic-bezier(0.25, 0.1, 0.25, 1.0) infinite;
 }
 
 @keyframes arrival-flicker {
     0%, 100% {
         background-color: #1a2332;
     }
-    25% {
+    20% {
         background-color: #2d3a4f;
     }
-    50% {
+    45% {
         background-color: #1f2937;
     }
-    75% {
+    70% {
         background-color: #253448;
+    }
+    85% {
+        background-color: #1a2332;
     }
 }
 
 /* State: Alert - Sharp red/orange, faster flicker or pulse */
 .state-alert {
     background-color: #8b1a1a;
-    animation: alert-pulse 0.8s ease-in-out infinite;
+    animation: alert-pulse 3s cubic-bezier(0.4, 0.0, 0.2, 1.0) infinite;
 }
 
 @keyframes alert-pulse {
@@ -169,38 +188,45 @@ body {
         background-color: #8b1a1a;
         box-shadow: 0 0 0 0 rgba(255, 69, 0, 0.4);
     }
-    50% {
+    30% {
         background-color: #ff4500;
         box-shadow: 0 0 50px 20px rgba(255, 69, 0, 0.2);
     }
+    60% {
+        background-color: #cc2d00;
+        box-shadow: 0 0 30px 15px rgba(255, 69, 0, 0.15);
+    }
 }
 
-/* State: Adaptive - Deep blue/teal, soft wave-like animation */
+/* State: Adaptive - Violet/blue/pink mix, soft wave-like animation */
 .state-adaptive {
-    background-color: #0d2b3d;
-    animation: adaptive-wave 6s ease-in-out infinite;
+    background-color: #2d1b4e;
+    animation: adaptive-wave 12s cubic-bezier(0.3, 0.0, 0.4, 1.0) infinite;
     position: relative;
 }
 
 @keyframes adaptive-wave {
     0%, 100% {
-        background-color: #0d2b3d;
+        background-color: #2d1b4e;
     }
     25% {
-        background-color: #1a4a5c;
+        background-color: #4a2d6b;
     }
     50% {
-        background-color: #154051;
+        background-color: #5b3a7a;
     }
-    75% {
-        background-color: #1a4a5c;
+    70% {
+        background-color: #4a2d6b;
+    }
+    85% {
+        background-color: #3d2359;
     }
 }
 
 /* State: Connection - Warm amber, slow breathing glow */
 .state-connection {
     background-color: #4a2c0a;
-    animation: connection-breathe 4s ease-in-out infinite;
+    animation: connection-breathe 11s cubic-bezier(0.25, 0.1, 0.35, 1.0) infinite;
 }
 
 @keyframes connection-breathe {
@@ -208,9 +234,13 @@ body {
         background-color: #4a2c0a;
         box-shadow: inset 0 0 100px rgba(139, 105, 20, 0.1);
     }
-    50% {
+    35% {
         background-color: #8b6914;
         box-shadow: inset 0 0 150px rgba(139, 105, 20, 0.3);
+    }
+    65% {
+        background-color: #6a4a0f;
+        box-shadow: inset 0 0 120px rgba(139, 105, 20, 0.2);
     }
 }
 
