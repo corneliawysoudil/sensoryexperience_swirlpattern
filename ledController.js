@@ -11,48 +11,73 @@ const LEDController = {
 
     // LED color mappings for each state (RGBW 0-255)
     // Colors are derived from state configs, optimized for RGBW strips
+    // These are base colors - animations will vary from these
     stateLEDColors: {
-        standby: { r: 2, g: 2, b: 2, w: 1 },      // Very dark, minimal white
-        arrival: { r: 20, g: 45, b: 80, w: 120 },  // Cold blue-white
-        alert: { r: 255, g: 69, b: 0, w: 0 },      // Sharp red-orange
-        adaptive: { r: 5, g: 50, b: 100, w: 40 },  // Deep blue-teal
-        connection: { r: 238, g: 166, b: 56, w: 80 } // Warm amber
+        // Calculated from stateConfigs - will be updated dynamically
     },
 
-    // Convert RGB (0-1) to RGBW (0-255) with white channel optimization
+    // Convert RGB (0-1) to RGBW (0-255) with NO white channel for maximum color saturation
     rgbToRGBW(r, g, b) {
         // Scale to 0-255
-        const r255 = Math.round(r * 255);
-        const g255 = Math.round(g * 255);
-        const b255 = Math.round(b * 255);
+        let r255 = Math.round(r * 255);
+        let g255 = Math.round(g * 255);
+        let b255 = Math.round(b * 255);
 
-        // Calculate white component (minimum of RGB for efficiency)
-        const w = Math.min(r255, g255, b255);
-
-        // Subtract white from RGB
-        const rFinal = Math.max(0, r255 - w);
-        const gFinal = Math.max(0, g255 - w);
-        const bFinal = Math.max(0, b255 - w);
-
+        // Boost colors for better visibility and saturation
+        // Find the maximum value to determine scaling
+        const maxVal = Math.max(r255, g255, b255);
+        
+        // Boost dim colors more aggressively to match website appearance
+        if (maxVal > 0) {
+            // Boost factor: scale up to make colors more vibrant
+            // For very dim colors, boost more; for bright colors, boost less
+            let boostFactor = 1.0;
+            if (maxVal < 30) {
+                boostFactor = 100 / maxVal; // Strong boost for very dim
+            } else if (maxVal < 100) {
+                boostFactor = 1.5; // Moderate boost
+            } else if (maxVal < 200) {
+                boostFactor = 1.2; // Light boost
+            }
+            
+            r255 = Math.min(255, Math.round(r255 * boostFactor));
+            g255 = Math.min(255, Math.round(g255 * boostFactor));
+            b255 = Math.min(255, Math.round(b255 * boostFactor));
+        }
+        
+        // For RGBW strips, set white to 0 for maximum saturation
+        // RGB values stay as-is (no white subtraction)
         return {
-            r: Math.min(255, rFinal),
-            g: Math.min(255, gFinal),
-            b: Math.min(255, bFinal),
-            w: Math.min(255, w)
+            r: Math.min(255, r255),
+            g: Math.min(255, g255),
+            b: Math.min(255, b255),
+            w: 0  // No white channel for saturated colors
         };
     },
 
-    // Get LED color for a state (using predefined or calculated)
+    // Get LED color for a state (calculated from stateConfigs)
     getStateColor(state) {
-        if (this.stateLEDColors[state]) {
-            return this.stateLEDColors[state];
-        }
-        
-        // Fallback: calculate from state config
         const config = stateConfigs[state];
         if (config) {
-            // Use secondary color (brighter) for LED
-            const rgbw = this.rgbToRGBW(config.secondary[0], config.secondary[1], config.secondary[2]);
+            // Mix primary and secondary colors for better representation
+            // Use 70% secondary (brighter) + 30% primary (darker) for depth
+            const mixFactor = 0.7;
+            const r = config.primary[0] * (1 - mixFactor) + config.secondary[0] * mixFactor;
+            const g = config.primary[1] * (1 - mixFactor) + config.secondary[1] * mixFactor;
+            const b = config.primary[2] * (1 - mixFactor) + config.secondary[2] * mixFactor;
+            
+            let rgbw = this.rgbToRGBW(r, g, b);
+            
+            // Special handling for standby - add very faint light (no white, just RGB)
+            if (state === 'standby') {
+                rgbw.r = Math.max(3, rgbw.r);
+                rgbw.g = Math.max(4, rgbw.g);
+                rgbw.b = Math.max(5, rgbw.b);
+                rgbw.w = 0; // No white for saturation
+            }
+            
+            // Cache it
+            this.stateLEDColors[state] = rgbw;
             return rgbw;
         }
         
@@ -204,19 +229,20 @@ const LEDController = {
     },
 
     // Set LED state (called when exhibition state changes)
+    // Uses smooth but faster transitions
     async setState(state) {
-        this.currentState = state;
-        
         if (!this.isConnected) {
+            this.currentState = state;
             return; // Silently fail if not connected
         }
 
-        const color = this.getStateColor(state);
-        await this.sendCommand(state, color);
+        // Use smooth but faster transition (3.5 seconds)
+        await this.transitionToState(state, 3500);
     },
 
-    // Smooth transition between colors (optional enhancement)
-    async transitionToState(state, duration = 5000) {
+    // Smooth transition between colors - faster than website for better responsiveness
+    async transitionToState(state, duration = 3500) {
+        const previousState = this.currentState;
         this.currentState = state;
         
         if (!this.isConnected) {
@@ -224,9 +250,9 @@ const LEDController = {
         }
 
         const targetColor = this.getStateColor(state);
-        const startColor = this.getStateColor(this.currentState) || { r: 0, g: 0, b: 0, w: 0 };
+        const startColor = previousState ? this.getStateColor(previousState) : { r: 0, g: 0, b: 0, w: 0 };
         
-        const steps = 50; // Number of intermediate steps
+        const steps = 100; // More steps for smoother transition
         const stepDuration = duration / steps;
         let currentStep = 0;
 
@@ -237,10 +263,10 @@ const LEDController = {
         this.transitionInterval = setInterval(async () => {
             const progress = currentStep / steps;
             
-            // Ease-in-out interpolation
+            // Quintic ease-in-out matching website transitions
             const eased = progress < 0.5
-                ? 2 * progress * progress
-                : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                ? 16.0 * progress * progress * progress * progress * progress
+                : 1.0 - Math.pow(-2.0 * progress + 2.0, 5.0) / 2.0;
 
             const color = {
                 r: Math.round(startColor.r + (targetColor.r - startColor.r) * eased),
